@@ -1,4 +1,4 @@
-city <- read.csv("~/Desktop/TS final project/GlobalLandTemperaturesByMajorCity.csv")
+city <- read.csv("~/Desktop/Time Series/TS FP Raw Data/GlobalLandTemperaturesByMajorCity.csv")
 unique(city["City"])
 
 library(tidyverse)
@@ -27,8 +27,25 @@ lessna[lessna["City"] == "Rome",]
 
 
 # Select Shanghai Seoul Berlin London Cairo Melbourne Los Angeles Mexico
-city[city["City"] == "Shanghai",]
-city[city["City"] == "Seoul",]
+start_dt <- c(city[city["City"] == "Shanghai",]$dt[1],
+              city[city["City"] == "Seoul",]$dt[1],
+              city[city["City"] == "Berlin",]$dt[1],
+              city[city["City"] == "London",]$dt[1],
+              city[city["City"] == "Los Angeles",]$dt[1],
+              city[city["City"] == "Mexico",]$dt[1],
+              city[city["City"] == "Cairo",]$dt[1],
+              city[city["City"] == "Melbourne",]$dt[1])
+sum_na <- c(lessna[lessna["City"] == "Shanghai",]$sumNA,
+            lessna[lessna["City"] == "Seoul",]$sumNA,
+            lessna[lessna["City"] == "Berlin",]$sumNA,
+            lessna[lessna["City"] == "London",]$sumNA,
+            lessna[lessna["City"] == "Los Angeles",]$sumNA,
+            lessna[lessna["City"] == "Mexico",]$sumNA,
+            lessna[lessna["City"] == "Cairo",]$sumNA,
+            lessna[lessna["City"] == "Melbourne",]$sumNA)
+cities <- c("Shanghai","Seoul","Berlin","London","Los Angeles","Mexico","Cairo","Melbourne")
+view(data.frame(Cities=cities, Sum_NA=sum_na, Start_Date=start_dt))
+
 
 shanghai <- city[city["City"] == "Shanghai",]
 seoul <- city[city["City"] == "Seoul",]
