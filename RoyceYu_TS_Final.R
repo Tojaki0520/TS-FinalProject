@@ -1,6 +1,8 @@
+#Global Data
 global <- read.csv("~/downloads/TS_Climate/GlobalTemperatures.csv")
 class(global$dt)
 class(global$LandAverageTemperature)
+head(global, n=5)
 
 library(xts)
 library(tidyverse)
@@ -16,21 +18,63 @@ newglobal_xts <- na_kalman(global_xts)
 statsNA(newglobal_xts)
 #write.zoo(newglobal_xts, file = '~/downloads/imputed_Global.csv', sep = ',')
 
-train <- global_xts[c(1:3156),]
-test <- global_xts[c(3157:3192),]
+train <- newglobal_xts[c(1:3156),]
+test <- newglobal_xts[c(3157:3192),]
+vali <- newglobal_xts[c(1993:3192),]
+decomlat = stl(train, s.window="periodic")
+plot(train)
+plot(vali)
+plot(decomlat)
+plot(test)
+library(tseries)
+kpss.test(train)
+adf.test(train, alternative = "stationary")
+acf(train,lag=100)
+pacf(train,lag=100)
 
 library(forecast)
-sarima_temp <- auto.arima(train, D=1)
-summary(sarima_temp)
+#sarima_temp <- auto.arima(train, D=1)
+#summary(sarima_temp)
+#checkresiduals(sarima_temp,lag.max=11)
 
-sarima_pred <- forecast(sarima_temp, h=36)
-sarima_pred$mean
+#sarima_pred <- forecast(sarima_temp, h=36)
+#sarima_pred$mean
+#autoplot(sarima_pred,include=156)
+
+sarima_mod = Arima(train,order=c(0,1,1),seasonal = c(0,1,1))
+summary(sarima_mod)
+checkresiduals(sarima_mod,lag.max=11)
+
+sarima_pred <- forecast(sarima_mod, h=36)
+autoplot(sarima_pred,include=156)
+dat <- cbind(sarima_pred$mean,test)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
 
 library(Metrics)
 rmse <- rmse(test$LandAverageTemperature, sarima_pred$mean)
 smape <- smape(test$LandAverageTemperature, sarima_pred$mean)
-error <- c(rmse, smape)
-error
+global_metrics <- c(rmse, smape)
+global_metrics
+
+sarima_pred30 <- forecast(sarima_mod, h=216)
+autoplot(sarima_pred30,include=156)
+sarima_pred30$mean
+write.zoo(sarima_pred30$mean, file = '~/downloads/pred30.csv', sep = ',')
+
+pred30 <- read.csv("~/downloads/pred30.csv", header = FALSE)
+typeof(pred30$V2)
+length(pred30$V2)
+library(Thermimage)
+list30 <- .colMeans(pred30$V2, 12, 18)
+length(list30)
+list30
+
+year <- (2013:2030)
+df30 <- data.frame(Year = year, Average_Temperature = list30)
+write.zoo(df30, file = '~/downloads/df30.csv', sep = ',')
+
+#Major City
 
 city <- read.csv("~/downloads/TS_Climate/GlobalLandTemperaturesByMajorCity.csv")
 city$dt <- as.yearmon(city$dt, "%Y-%m-%d")
@@ -83,6 +127,23 @@ shanghai_test <- shanghai_xts[c(1942:1977),]
 london_train <- london_xts[c(1:1941),]
 london_test <- london_xts[c(1942:1977),]
 
+d_berlin <- stl(berlin_train, s.window="periodic")
+plot(d_berlin)
+d_cairo <- stl(cairo_train, s.window="periodic")
+plot(d_cairo)
+d_la <- stl(la_train, s.window="periodic")
+plot(d_la)
+d_mel <- stl(mel_train, s.window="periodic")
+plot(d_mel)
+d_mexico <- stl(mexico_train, s.window="periodic")
+plot(d_mexico)
+d_seoul <- stl(seoul_train, s.window="periodic")
+plot(d_seoul)
+d_shanghai <- stl(shanghai_train, s.window="periodic")
+plot(d_shanghai)
+d_london <- stl(london_train, s.window="periodic")
+plot(d_london)
+
 sarima_berlin <- auto.arima(berlin_train, D=1)
 summary(sarima_berlin)
 sarima_cairo <- auto.arima(cairo_train, D=1)
@@ -93,7 +154,7 @@ sarima_mel <- auto.arima(mel_train, D=1)
 summary(sarima_mel)
 sarima_mexico <- auto.arima(mexico_train, D=1)
 summary(sarima_mexico)
-sarima_seoul <- auto.arima(seoul_train, D=1)
+sarima_seoul <- Arima(seoul_train,order=c(0,1,1),seasonal = c(2,1,0))
 summary(sarima_seoul)
 sarima_shanghai <- auto.arima(shanghai_train, D=1)
 summary(sarima_shanghai)
@@ -132,8 +193,50 @@ london_pred <- forecast(sarima_london, h=36)
 london_rmse <- rmse(london_test, london_pred$mean)
 london_smape <- smape(london_test, london_pred$mean)
 
+autoplot(berlin_pred,include=156)
+autoplot(cairo_pred,include=156)
+autoplot(la_pred,include=156)
+autoplot(mel_pred,include=156)
+autoplot(mexico_pred,include=156)
+autoplot(seoul_pred,include=156)
+autoplot(shanghai_pred,include=156)
+autoplot(london_pred,include=156)
+
+dat1 <- cbind(berlin_pred$mean,berlin_test)
+dat2 <- cbind(cairo_pred$mean,cairo_test)
+dat3 <- cbind(la_pred$mean,la_test)
+dat4 <- cbind(mel_pred$mean,mel_test)
+dat5 <- cbind(mexico_pred$mean,mexico_test)
+dat6 <- cbind(seoul_pred$mean,seoul_test)
+dat7 <- cbind(shanghai_pred$mean,shanghai_test)
+dat8 <- cbind(london_pred$mean,london_test)
+
+matplot(dat1, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat2, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat3, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat4, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat5, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat6, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat7, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+matplot(dat8, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+
+
 city <- c('Berlin', 'Cairo', 'Los Angeles', 'Melbourne', 'Mexico', 'Seoul', 'Shanghai', 'London')
 rmse <- c(berlin_rmse, cairo_rmse, la_rmse, mel_rmse, mexico_rmse, seoul_rmse, shanghai_rmse, london_rmse)
 smape <- c(berlin_smape, cairo_smape, la_smape, mel_smape, mexico_smape, seoul_smape, shanghai_smape, london_smape)
 
 data.frame(City = city, RMSE = rmse, sMAPE = smape)
+
+nan <- c(1.915373, 4.660167, 5.627005, 3.081471, 2.119575, 1.457867, 8.090076, 1.669380)
+royce <- rmse
+will <- c(2.032635, 1.301818, 1.311217, 0.890430, 0.930498, 2.139120, 1.387452, 1.593907)
+jaki <- c(1.868114, 1.522044, 1.328693, 1.202162, 1.126964, 2.164168, 1.411737, 1.752233)
+data.frame(City = city, ARIMA = nan, SARIMA = royce, LSTM = will, Gluonts = jaki)
