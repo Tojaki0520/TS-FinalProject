@@ -1,0 +1,445 @@
+---
+title: "Final Project"
+author: "jingwen"
+date: "5/26/2022"
+output: html_document
+---
+```{r}
+library(forecast)
+library(tseries)
+library(tidyverse)
+library(xts)
+library(imputeTS)
+library(Metrics)
+library(rugarch)
+library(ggplot2)
+```
+# Data Clean for global
+
+```{r}
+global <- read.csv("/Users/apple/Desktop/Spring2022/TS/final_project/GlobalTemperatures.csv")
+class(global$dt)
+class(global$LandAverageTemperature)
+global$dt <- as.yearmon(global$dt, "%Y-%m-%d")
+class(global$dt)
+global_xts <- xts(global$LandAverageTemperature, order.by = global$dt)
+names(global_xts) <- 'LandAverageTemperature'
+global
+ts.plot(global_xts)
+statsNA(global_xts)
+newglobal_xts <- na_kalman(global_xts)
+statsNA(newglobal_xts)
+data <-newglobal_xts
+data.frame(data)
+length(data)
+test =tail(data,36)
+train= head(data,length(data)-36)
+boxplot(train)$out
+```
+
+
+# City Data Import 
+```{r}
+seoul<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/seoul.csv',header = F)
+shanghai<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/shanghai.csv',header = F)
+cairo<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/cairo.csv',header = F)
+LA<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/los_angeles.csv',header = F)
+melbourne<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/melbourne.csv',header = F)
+mexico<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/mexico.csv',header = F)
+london<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/london.csv',header = F)
+berlin<-read.csv('/Users/apple/Desktop/Spring2022/TS/final_project/city_file/berlin.csv',header = F)
+city_name = c('seoul','shanghai','cairo','LA','melbourne','mexio','london','berlin')
+
+names(seoul)= c('dt','LandAverageTemperature')
+names(shanghai)=c('dt','LandAverageTemperature')
+names(cairo)=c('dt','LandAverageTemperature')
+names(LA)=c('dt','LandAverageTemperature')
+names(melbourne)=c('dt','LandAverageTemperature')
+names(mexico)=c('dt','LandAverageTemperature')
+names(london)=c('dt','LandAverageTemperature')
+names(berlin)=c('dt','LandAverageTemperature')
+View(seoul)
+nrow(seoul)
+```
+
+
+
+
+# EDA
+## Decomposition for whole data
+```{r}
+delat_ma = ts(train)
+decomlat = stl(diff(train), s.window="periodic")
+deseasonal_cnt <- seasadj(decomlat)
+plot(decomlat)
+plot(train)
+plot(test)
+#View(data)
+```
+
+
+## Stationary
+
+```{r}
+kpss.test(diff(seoul$LandAverageTemperature))
+kpss.test(diff(shanghai$LandAverageTemperature))
+kpss.test(diff(LA$LandAverageTemperature))
+kpss.test(diff(cairo$LandAverageTemperature))
+kpss.test(diff(melbourne$LandAverageTemperature))
+kpss.test(diff(mexico$LandAverageTemperature))
+kpss.test(diff(berlin$LandAverageTemperature))
+kpss.test(diff(london$LandAverageTemperature))
+kpss.test(diff(train$LandAverageTemperature))
+adf.test(train, alternative = "stationary")
+acf(data$LandAverageTemperature,lag =30)
+pacf(data$LandAverageTemperature,lag=100)
+```
+
+## Arima
+### Fit model for global whole data and forecast next 15 years
+```{r}
+library(zoo)
+mod = auto.arima(data,seasonal=F)
+summary(mod)#10102
+mod1 = Arima(data,order=c(8,1,14))
+summary(mod1)
+a =forecast(mod1,h=12*15)
+DF <- as.data.frame(a)
+rownames(DF) = as.yearmon(seq(as.Date("2016/01/01"), by = "month", length.out = 12*15), "%Y-%m-%d")
+future = DF['Point Forecast']
+
+names(future) ='LandAverageTemperature'
+
+b = as.data.frame(test)
+names(b) ='LandAverageTemperature'
+
+new = rbind(b,future)
+
+new = xts(new,order.by = as.yearmon(seq(as.Date("2013/01/01"), by = "month", length.out = 12*18), "%Y-%m-%d"))
+decomlat = stl(new, s.window="periodic")
+deseasonal_cnt <- seasadj(decomlat)
+plot(decomlat)
+
+
+seq(as.Date("2018/01/01"), by = "month", length.out = 12*3)
+
+delat_ma = ts(train)
+decomlat = stl(train, s.window="periodic")
+deseasonal_cnt <- seasadj(decomlat)
+plot(decomlat)
+AverageTemperature = c()
+
+for(i in 1:18){
+  j = i*12
+  AverageTemperature [i] = mean(new[i:j])
+  i= i*12+1
+}
+AverageTemperature 
+year = c('2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025','2026','2027','2028','2029','2030')
+data.frame(year,AverageTemperature)
+
+```
+
+### Fit model for global based on train and test
+```{r}
+data <-newglobal_xts
+test =tail(data,36)
+train= head(data,length(data)-36)
+View(train)
+#sarima_mod = auto.arima(train,seasonal = T)
+#rmse(test,forecast(sarima_mod,h=36)$mean)
+summary(sarima_mod)
+checkresiduals(sarima_mod,lag.max=11)
+Arima(train,order=c(2,0,3),seasonal = c(1,1,0))#8175.3
+#sarima_mod =Arima(train,order=c(2,0,4),seasonal = c(1,1,0))#8143.55
+sarima_mod=Arima(train,order=c(0,1,1),seasonal = c(0,1,1))#7595.31
+rmse(test,forecast(sarima_mod,h=36)$mean)
+
+
+mod_arima_base = auto.arima(train,seasonal = F)#AIC=10015.96
+summary(mod_arima_base)# ARIMA(5,1,0)
+checkresiduals(mod_arima_base,lag.max=12)
+#Arima(train,order=c(5,1,1))
+#Arima(train,order=c(5,1,2))
+#Arima(train,order=c(5,1,3))
+#Arima(train,order=c(5,1,4))
+#Arima(train,order=c(6,1,3))#AIC=7396.31
+mod_arima = Arima(train,order=c(8,1,14))
+summary(mod_arima)
+checkresiduals(Arima(train,order=c(8,1,14)),lag.max=12)
+#summary(Arima(train,order=c(8,1,15)))#AIC 7357
+#summary(Arima(train,order=c(8,1,14)))#AIC 7335 best
+#summary(Arima(train,order=c(9,1,14)))#AIC 7359
+#summary(Arima(train,order=c(8,1,13)))# AIC 7352.25
+#summary(Arima(train,order=c(7,1,13)))# AIC 7389.76
+#summary(Arima(train,order=c(8,1,16)))# AIC 7561.08
+#summary(Arima(train,order=c(7,1,14)))# AIC 7435.51
+
+prediction = forecast(mod_arima_base,h=36)$mean
+result_global = c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+result_global
+autoplot(forecast(mod_arima_base,h=36),include=156)
+#trend_global_forecast = forecast::ma(prediction,12)
+#plot(trend_global_forecast)
+hist(train)
+```
+
+### plot: prediction vs test
+
+```{r}
+prediction = forecast(mod_arima_base,h=36)$mean
+actual = test
+#predictionDirRec = tail(predictionDirRec,12)
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2)
+legend("bottomright", legend = c('prediction','actual'), col=1:2, pch=1)
+?matplot
+```
+
+
+###Seoul
+
+```{r}
+seoul$dt <-as.yearmon(as.Date(as.yearmon(seoul$dt)),"%Y-%m-%d")
+#class(seoul$dt)
+seoul_xts <- xts(seoul$LandAverageTemperature, order.by = seoul$dt)
+test =tail(seoul_xts,36)
+train = head(seoul_xts,length(seoul_xts)-36)
+hist(train)
+
+#base = auto.arima(train,seasonal = T)#6515.77
+
+#sarima_mod=Arima(train,order=c(3,0,1),seasonal = c(2,1,1))#1.56
+#sarima_mod=Arima(train,order=c(3,0,1),seasonal = c(2,1,0))#6472.29:1.472
+#sarima_mod=Arima(train,order=c(3,0,1),seasonal = c(2,1,1))
+#sarima_mod=Arima(train,order=c(4,0,1),seasonal = c(2,1,0))#1.473
+#sarima_mod=Arima(train,order=c(5,0,1),seasonal = c(2,1,0))#1.51
+#sarima_mod=Arima(train,order=c(3,1,1),seasonal = c(2,1,0))#1.52
+#sarima_mod=Arima(train,order=c(3,1,1),seasonal = c(2,1,1))#1.58
+#sarima_mod=Arima(train,order=c(0,1,1),seasonal = c(2,1,1))#1.54
+#sarima_mod=Arima(train,order=c(0,0,1),seasonal = c(2,1,1))#1.53
+#sarima_mod=Arima(train,order=c(0,0,1),seasonal = c(2,1,0))#1.50
+#sarima_mod=Arima(train,order=c(0,1,1),seasonal = c(2,1,0))#1.44
+
+#summary(sarima_mod)
+#rmse(test,forecast(sarima_mod,h=36)$mean)
+
+a = auto.arima(train,seasonal = F)
+mod_arima =Arima(train,order=c(13,1,1))#6654.27
+summary(mod_arima)
+checkresiduals(a,lag.max=10)
+checkresiduals(mod_arima ,lag.max=10)
+prediction = forecast(mod_arima,h=36)$mean
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_seoul = c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+result_seoul
+autoplot(forecast(mod_arima,h=36),include=156)
+
+decomlat = stl(train[1:61], s.window="periodic")
+deseasonal_cnt <- seasadj(decomlat)
+plot(decomlat)
+head(seoul)
+boxplot(train)
+hist(train)
+View(train)
+```
+
+
+
+
+
+
+### London 
+
+```{r}
+
+london$dt <-as.yearmon(as.Date(as.yearmon(london$dt)),"%Y-%m-%d")
+class(london$dt)
+london_xts <- xts(london$LandAverageTemperature, order.by = london$dt)
+test =tail(london_xts,36)
+train = head(london_xts,length(seoul_xts)-36)
+a = auto.arima(train,seasonal = F)#AIC 9237.98
+summary(a)#1,1,3
+checkresiduals(a,lag.max=10)
+mod_london<-Arima(train,order=c(5,1,6))#6897
+summary(mod_london)
+checkresiduals(mod_london,lag.max=10)
+prediction = forecast(mod_london,h=36)$mean
+result_london = c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_london,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_london 
+autoplot(forecast(mod_london,h=36),include=156)
+hist(train)
+boxplot(train)
+```
+
+
+### Berlin
+
+```{r}
+berlin$dt <-as.yearmon(as.Date(as.yearmon(berlin$dt)),"%Y-%m-%d")
+berlin_xts <- xts(berlin$LandAverageTemperature, order.by = berlin$dt)
+test =tail(berlin_xts,36)
+train = head(berlin_xts,length(berlin_xts)-36)
+a= auto.arima(train,seasonal = F)
+mod_berlin<-Arima(train,order=c(5,1,5))
+checkresiduals(mod_berlin,lag.max=10)
+prediction = forecast(mod_berlin,h=36)$mean
+result_berlin = c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_berlin,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_berlin
+autoplot(forecast(mod_berlin,h=36),include=156)
+hist(train)
+boxplot(train)
+```
+
+### mexico
+
+```{r}
+mexico$dt <-as.yearmon(as.Date(as.yearmon(mexico$dt)),"%Y-%m-%d")
+mexico_xts <- xts(mexico$LandAverageTemperature, order.by =mexico$dt)
+test =tail(mexico_xts,36)
+train = head(mexico_xts,length(mexico)-36)
+mod_mexico<-auto.arima(train,seasonal = F)
+summary(mod_mexico)#5483
+checkresiduals(mod_mexico,lag.max=10)
+
+mod_mexico<-Arima(train,order=c(4,1,3))
+checkresiduals(mod_mexico,lag.max=10)
+
+prediction = forecast(mod_mexico,h=36)$mean
+result_mexico = c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_berlin,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_mexico
+autoplot(forecast(mod_mexico,h=36),include=156)
+hist(train)
+boxplot(train)
+```
+
+### melbourne
+
+```{r}
+melbourne$dt <-as.yearmon(as.Date(as.yearmon(melbourne$dt)),"%Y-%m-%d")
+melbourne_xts <- xts(melbourne$LandAverageTemperature, order.by =melbourne$dt)
+test =tail(melbourne_xts,36)
+train = head(melbourne_xts,length(melbourne)-36)
+adf.test(train)
+mod_melbourne<-auto.arima(train,seasonal = F)
+checkresiduals(mod_melbourne,lag.max=10)
+summary(mod_melbourne)
+mod_melbourne<-Arima(train,order=c(2,1,2),method = 'ML')#5211
+prediction = forecast(mod_melbourne,h=36)$mean
+result_melbourne= c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_berlin,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_melbourne
+autoplot(forecast(mod_melbourne,h=36),include=156)
+hist(train)
+boxplot(train)
+```
+
+### LA
+
+```{r}
+LA$dt <-as.yearmon(as.Date(as.yearmon(LA$dt)),"%Y-%m-%d")
+LA_xts <- xts(LA$LandAverageTemperature, order.by =LA$dt)
+
+test =tail(LA_xts,36)
+train = head(LA_xts,length(LA)-36)
+adf.test(train)
+a =auto.arima(train,seasonal = F)#7513
+mod_LA<-Arima(train,order=c(3,1,7),method = 'ML')
+#checkresiduals(mod_LA)
+autoplot(forecast(mod_LA,h=36),include=156)
+#mod_LA<-Arima(train,order=c(3,1,7))
+prediction = forecast(mod_LA,h=36)$mean
+result_LA= c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_LA,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_LA
+hist(train)
+boxplot(train)
+```
+
+### cairo
+
+```{r}
+cairo$dt <-as.yearmon(as.Date(as.yearmon(cairo$dt)),"%Y-%m-%d")
+cairo_xts <- xts(cairo$LandAverageTemperature, order.by =cairo$dt)
+test =tail(cairo_xts,36)
+train = head(cairo_xts,length(LA)-36)
+adf.test(train)
+mod_cairo<-auto.arima(train,seasonal = F)#7575.03
+#checkresiduals(mod_cairo)
+mod_cairo<-Arima(train,order=c(4,1,1))
+#checkresiduals(mod_cairo)
+summary(mod_cairo)
+autoplot(forecast(mod_cairo,h=36),include=156)
+#mod_cairo<-Arima(train,order=c(8,1,14))
+prediction = forecast(mod_cairo,h=36)$mean
+result_cairo= c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_cairo,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_cairo
+hist(train)
+boxplot(train)
+```
+
+### shanghai
+
+```{r}
+shanghai$dt <-as.yearmon(as.Date(as.yearmon(shanghai$dt)),"%Y-%m-%d")
+shanghai_xts <- xts(shanghai$LandAverageTemperature, order.by =shanghai$dt)
+test =tail(shanghai_xts,36)
+train = head(shanghai_xts,length(shanghai)-36)
+adf.test(train)
+auto.arima(train,seasonal = F)
+mod_shanghai<-Arima(train,order=c(9,1,2))
+autoplot(forecast(mod_shanghai,h=36),include=156)
+#mod_shanghai<-Arima(train,order=c(10,1,1))
+#mod_shanghai<-Arima(train,order=c(8,1,14))
+summary(mod_shanghai)
+prediction = forecast(mod_shanghai,h=36)$mean
+result_shanghai= c(mse(test,prediction),smape(test,prediction),rmse(test,prediction)) 
+autoplot(forecast(mod_shanghai,h=36),include=156)
+actual = test
+dat = cbind(prediction,actual)
+matplot(dat, type = c("b"),pch=1,col = 1:2,)
+legend("topleft", legend = c('prediction','actual'), col=1:2, pch=1)
+result_shanghai
+hist(train)
+boxplot(train)
+```
+
+## Comparison for result
+```{r}
+name = c('mse','smape','rmse')
+a = rbind(result_global,result_berlin,result_london,result_LA,result_mexico,result_cairo,result_melbourne,result_seoul,result_shanghai)
+colnames(a) = name
+a
+```
+
